@@ -158,6 +158,30 @@ def to_netscape(cookies: list[dict], path: Path) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def to_polylens_cookie(cookies: list[dict]) -> Path:
+    """写 polylens-bilibili-mcp 的 cookie 文件（纯 Cookie header 文本）。
+
+    polylens 读 ~/.cache/polylens-bilibili/cookie，内容是 'SESSDATA=x; bili_jct=y'。
+    共用这一份，用户只需在浏览器里登录一次，两边都能用。
+    """
+    cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    d = cache / "polylens-bilibili"
+    d.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(d, 0o700)
+    except Exception:
+        pass
+    pairs = [f"{c['name']}={c['value']}" for c in cookies
+             if c.get("name") and c.get("domain", "").endswith("bilibili.com")]
+    p = d / "cookie"
+    p.write_text("; ".join(pairs), encoding="utf-8")
+    try:
+        os.chmod(p, 0o600)
+    except Exception:
+        pass
+    return p
+
+
 def load_cookie_jar(site: str) -> http.cookiejar.CookieJar | None:
     """从本地 cookies.json 构造 cookiejar，供 B站 API 用。"""
     p = COOKIE_DIR / f"{site}.json"
@@ -227,23 +251,49 @@ class Bilibili:
     def _clean(s: str) -> str:
         return re.sub(r"<[^>]+>", "", s or "").replace("&quot;", '"').replace("&amp;", "&")
 
-    def search(self, keyword: str, limit: int = 20, sort: str = "totalrank") -> list[dict]:
-        """sort: totalrank(综合) / click(播放) / pubdate(最新)"""
+    def search(self, keyword: str, limit: int = 20, sort: str = "totalrank",
+               retries: int = 3) -> list[dict]:
+        """sort: totalrank(综合) / click(播放) / pubdate(最新)
+
+        B站对并发/高频请求会返回空 result（code 仍为 0），必须退避重试；
+        否则三平台并发时 B站会静默返回 0 条。
+        """
         out: list[dict] = []
         page = 1
-        while len(out) < limit and page <= 10:
+        empty_streak = 0
+
+        def fetch(p: int) -> list[dict]:
             url = self._signed("/x/web-interface/wbi/search/type", {
                 "search_type": "video", "keyword": keyword,
-                "page": str(page), "order": sort,
+                "page": str(p), "order": sort,
             })
-            try:
-                res = http_json(self.op, url)
-            except Exception as e:
-                raise RuntimeError(f"B站搜索失败: {e}") from e
-            data = res.get("data") or {}
-            items = data.get("result") or []
+            for attempt in range(retries):
+                try:
+                    res = http_json(self.op, url)
+                except Exception as e:
+                    if attempt == retries - 1:
+                        raise RuntimeError(f"B站搜索失败: {e}") from e
+                    time.sleep(1.2 * (attempt + 1))
+                    continue
+                items = (res.get("data") or {}).get("result") or []
+                if items:
+                    return items
+                time.sleep(1.5 * (attempt + 1))   # 空结果多半是限流
+                url = self._signed("/x/web-interface/wbi/search/type", {
+                    "search_type": "video", "keyword": keyword,
+                    "page": str(p), "order": sort,
+                })
+            return []
+
+        while len(out) < limit and page <= 10:
+            items = fetch(page)
             if not items:
-                break
+                empty_streak += 1
+                if empty_streak >= 2:
+                    break
+                page += 1
+                continue
+            empty_streak = 0
             for v in items:
                 out.append({
                     "platform": "bilibili",
@@ -719,6 +769,14 @@ def cmd_login(args, cfg):
     print(f"\n已保存 {len(wanted)} 条 cookie：")
     print(f"  {COOKIE_DIR / f'{plat}.json'}")
     print(f"  {COOKIE_DIR / f'{plat}.txt'}   ← 供 v2t / yt-dlp 使用")
+
+    # B站 cookie 顺带喂给 polylens MCP，避免二次扫码
+    if plat == "bili":
+        try:
+            p = to_polylens_cookie(wanted)
+            print(f"  {p}   ← 供 polylens MCP 使用（共用登录态）")
+        except Exception as e:
+            print(f"  （polylens cookie 写入失败：{e}）")
 
     # 立即校验
     if plat == "bili":
