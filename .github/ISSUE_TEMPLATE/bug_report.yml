@@ -1,0 +1,75 @@
+name: 🐛 Bug 报告
+description: 搜索失败、结果不对、程序报错
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请填全环境信息 —— 这类工具的问题**九成是平台风控或登录态**，
+        没有这些信息很难定位。
+
+        另外请先看 README 的「平台限制」：抖音关键词搜索、YouTube 部分视频无字幕
+        是**平台层面的限制**，不是 bug。
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 期望结果 vs 实际结果
+      placeholder: |
+        期望：搜 "deepseek" 返回 20 条 B站视频
+        实际：返回 0 条，但没有报错
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      options:
+        - B站
+        - YouTube
+        - 抖音
+        - 三个都试过（all 模式）
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: command
+    attributes:
+      label: 完整命令
+      placeholder: vsearch all "deepseek harness" --limit 10
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: 完整输出
+      description: 包括可能的报错堆栈
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: 环境自检
+      description: 请运行 `python vsearch.py doctor` 并粘贴输出
+      render: shell
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 自查
+      options:
+        - label: 我看了 README 的「平台限制」，确认这不是已知的平台层面限制
+          required: true
+        - label: 我已重试过（平台限流是间歇性的）
+          required: false
+        - label: 我已搜索过已有 issue
+          required: true

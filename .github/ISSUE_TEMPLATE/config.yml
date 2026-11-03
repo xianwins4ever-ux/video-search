@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 使用文档
+    url: https://github.com/xianwins4ever-ux/video-search#readme
+    about: 安装、各平台能力边界、已知限制，先看这里
+  - name: 💬 提问与讨论
+    url: https://github.com/xianwins4ever-ux/video-search/discussions
+    about: 不确定是不是 bug、想聊聊用法，来这里

@@ -1,5 +1,28 @@
+# 缓存
 __pycache__/
 *.pyc
+*.pyo
+.pytest_cache/
+
+# 测试产物（本地保留，不入库）
+B站字幕测试/
+YouTube测试/
 抖音测试/
 文案输出/
-_probes/*_profile/
+最终验证/
+视频文案提取/
+
+# 开发期探测脚本与截图（本地保留，不入库）
+_probes/
+_screenshots/
+
+# 浏览器 profile（体积大且含登录态）
+*_profile/
+profiles/
+
+# 登录凭证
+cookies/
+*.cookie
+
+# 用户配置
+config.json
